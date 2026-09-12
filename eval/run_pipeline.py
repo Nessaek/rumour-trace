@@ -82,6 +82,7 @@ for p in sorted(glob.glob('eval/cases/*/case.json')):
     cases.append((c, ents))
 
 tally = {'correct': 0, 'rejected': 0, 'missed': 0, 'control_ok': 0, 'control_fail': 0}
+answers = []  # (case id, verdict, item) — reprinted at the end, see below
 
 for case, ents in cases:
     print(f"=== {case['id']}")
@@ -103,12 +104,14 @@ for case, ents in cases:
         if got is None:
             print(f"  ABSTAINED — {res['reason']}\n")
             tally['control_ok'] += 1
+            answers.append((case['id'], 'ABSTAINED', None))
         else:
             print(f"  FAILED TO ABSTAIN — named {got['id']} ({got['label']})")
             print(f"    {got['text'][:110]}")
             print(f"    {link(got)}")
             print(whence(got) + "\n")
             tally['control_fail'] += 1
+            answers.append((case['id'], 'FAILED TO ABSTAIN', got))
         continue
 
     truth = case['origin']
@@ -121,6 +124,7 @@ for case, ents in cases:
         print(f"    {link(got)}")
         print(whence(got) + "\n")
         tally['correct'] += 1
+        answers.append((case['id'], 'CORRECT', got))
     elif in_set and labelled[truth['id']]['label'] not in ('asserts', 'references'):
         print(f"  REJECTED — origin was a candidate but labelled "
               f"{labelled[truth['id']]['label']}")
@@ -133,6 +137,7 @@ for case, ents in cases:
             print(f"    answered instead: {link(got)}")
         print()
         tally['rejected'] += 1
+        answers.append((case['id'], 'REJECTED', got))
     elif not in_set:
         print(f"  MISSED — origin never reached the classifier (stage 3 / aliases)")
         if got:
@@ -141,6 +146,7 @@ for case, ents in cases:
             print(f"    answered instead: {link(got)}")
         print()
         tally['missed'] += 1
+        answers.append((case['id'], 'MISSED', got))
     else:
         h = (got['created_utc'] - truth['created_utc']) / 3600
         print(f"  EARLY — answered {fmt(got['created_utc'])} ({h:+.1f}h before origin)")
@@ -149,6 +155,7 @@ for case, ents in cases:
         print(f"    {link(got)}")
         print(whence(got) + "\n")
         tally['rejected'] += 1
+        answers.append((case['id'], 'EARLY', got))
 
 print(json.dumps(tally, indent=2))
 
@@ -160,3 +167,17 @@ print(f"{u['input']:,} in / {u['output']:,} out, "
 print(f"cost ${u['cost']:.2f}")
 print(f"\ntranscript: {LOG}")
 print(f"labels:     {RUNS}/{ts}-<case>.json")
+
+# The answer last, on its own, because it is the thing you came for and the
+# thing you will paste to someone else. Everything above it is diagnostics.
+print("\n" + "=" * 62)
+for cid, verdict, item in answers:
+    print(f"{verdict}  {cid}")
+    if item is None:
+        print("  no item carries the claim — nothing to link\n")
+        continue
+    print(f"  {fmt(item['created_utc'])}  {item['kind']}  labelled {item['label']}")
+    if item.get('quote'):
+        print(f"  {item['quote']!r}")
+    print(f"  {link(item)}")
+    print(f"  {whence(item).strip()}\n")
