@@ -15,25 +15,24 @@ baseline runs; its answers are wrong in an instructive way (see below).
 Five stages. The work is in narrowing 1.5M items to a set small enough to read
 in full, then reading it — there is no ranking anywhere after stage 3.
 
+```mermaid
+flowchart TB
+    A["Arctic Shift API"] -->|"ingest/run.js"| B["NDJSON on disk<br/>26,690 posts + 1,535,246 comments<br/>every day of 2024"]
+    B -->|"load_corpus()"| C["1,084,212 usable items<br/>31% of comments dropped:<br/>removed, row kept, text gone"]
+    C -->|"stage 3 · candidates()"| D["70 – 3,717 candidates<br/>entity co-occurrence<br/>~90% qualify on thread title,<br/>not their own text"]
+    D -->|"stage 4 · classify()"| E["every candidate labelled<br/>asserts · references<br/>mentions_only · unrelated"]
+    E -->|"stage 5 · find_origin()"| F["earliest carrier wins<br/>sort by time, take the first<br/>no ranking anywhere"]
+    F --> G["the answer + its permalink"]
+
+    C -.->|"alias missed"| X["MISSED<br/>origin never reached<br/>the classifier"]
+    D -.->|"wrong label"| Y["REJECTED<br/>origin was a candidate,<br/>labelled mentions_only"]
+    E -.->|"one early false positive"| Z["EARLY<br/>something earlier than the<br/>origin, that isn't the claim"]
 ```
-1  ingest      Arctic Shift -> NDJSON          ingest/run.js, fetch.js
-                 26,690 posts + 1,535,246 comments, every day of 2024
-                 coverage.js exits non-zero on any missing or thin day
 
-2  load        NDJSON -> items + threads       retrieve/filter.py:load_corpus
-                 1,084,212 usable items (removed comments dropped here)
+Each stage owns one failure, which is why the eval reports three outcomes
+rather than two: a first-pass miss and a wrongly-rejected candidate need
+opposite fixes, and a false early needs a different fix again.
 
-3  filter      entity co-occurrence            retrieve/filter.py:candidates
-                 1.08M -> 70 to 3,717, by alias match in the item's own
-                 text OR its thread title. ~90% qualify via the thread.
-
-4  classify    four labels, one API call/40    classify/classify.py
-                 asserts | references | mentions_only | unrelated
-                 claude-opus-5, effort low, rubric in a cached prefix
-
-5  origin      earliest carrier wins           retrieve/origin.py:find_origin
-                 no ranking: sort the carriers by time, take the first
-```
 
 Around it:
 
